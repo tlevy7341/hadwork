@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   FaHourglassStart,
   FaHourglassHalf,
@@ -9,23 +9,14 @@ import {
   Grid,
   GridItem,
   Text,
-  Flex,
   Heading,
   Divider,
-  Button,
   VStack,
   SimpleGrid,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverBody,
-  PopoverArrow,
-  Input,
-  useToast,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import type { NextPage, NextPageContext } from "next";
-import { useQuery, QueryClient, dehydrate } from "react-query";
+import { useQuery, QueryClient, dehydrate, useQueryClient } from "react-query";
 import { useSession, getSession } from "next-auth/react";
 import Head from "next/head";
 import MenuHeader from "../components/MenuHeader";
@@ -55,21 +46,28 @@ const getProjects = async () => {
 const Home: NextPage = () => {
   const { push } = useRouter();
   const { data: session } = useSession();
-  const [activeProject, setActiveProject] = useState("HadWork");
-  /*   const [activeProject, setActiveProject] = useState(() => {
-    const project = localStorage.getItem("activeProject");
+  const queryClient = useQueryClient();
+  //const [activeProject, setActiveProject] = useState("HadWork");
+  const [activeProject, setActiveProject] = useState(() => {
+    let project;
+    if (localStorage) {
+      console.log("Yes");
+      project = localStorage.getItem("activeProject");
+    } else {
+      const projects: ProjectsType[] | undefined =
+        queryClient.getQueryData("projects");
+
+      if (projects) {
+        const randomProject =
+          projects[Math.floor(Math.random() * projects.length)];
+        setActiveProject(randomProject.name);
+      }
+    }
+
     return project !== null ? project : "";
-  }); */
+  });
 
   const { data } = useQuery<ProjectsType[], Error>("projects", getProjects);
-  const todos: any = data
-    ?.map((project: ProjectsType) => {
-      if (activeProject === project.name) {
-        return project["Todos"];
-      }
-    })
-    .filter((project) => project)
-    .flat();
 
   useEffect(() => {
     if (!session?.user) {
@@ -122,7 +120,9 @@ const Home: NextPage = () => {
           </GridItem>
           <GridItem rowSpan={2} colSpan={4} bg="gray.50">
             <VStack pt={"2"}>
-              <Heading color={"gray.700"}>{activeProject}</Heading>
+              <Heading color={"gray.700"}>
+                {activeProject ? activeProject : ""}
+              </Heading>
             </VStack>
             <SimpleGrid
               minH={"400px"}
@@ -132,19 +132,16 @@ const Home: NextPage = () => {
             >
               <ProgressBox
                 title={"Todo"}
-                todos={todos}
                 activeProject={activeProject}
                 icon={<FaHourglassStart />}
               />
               <ProgressBox
                 title={"Doing"}
-                todos={todos}
                 activeProject={activeProject}
                 icon={<FaHourglassHalf />}
               />
               <ProgressBox
                 title={"Done"}
-                todos={todos}
                 activeProject={activeProject}
                 icon={<FaHourglassEnd />}
               />
