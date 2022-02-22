@@ -97,7 +97,7 @@ const ProgressBox = ({
   //Handles getting the Todos
   const getTodos = async () => {
     const response = await fetch(
-      `http://localhost:3000/api/todos?projectName=${activeProject}`
+      `https://hadwork.vercel.app/api/todos?projectName=${activeProject}`
     );
     return response.json();
   };

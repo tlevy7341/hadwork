@@ -108,7 +108,7 @@ const AddProjectSection = ({
     onSettled: async (data) => {
       queryClient.invalidateQueries("projects");
       toast({
-        title: "Project deleted 🎉",
+        title: "Project Added 🎉",
         status: "success",
         duration: 2000,
         isClosable: true,

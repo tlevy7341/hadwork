@@ -39,7 +39,7 @@ type TodosType = {
 };
 
 const getProjects = async () => {
-  const response = await fetch("http://localhost:3000/api/projects");
+  const response = await fetch("https://hadwork.vercel.app/api/projects");
   return response.json();
 };
 
