@@ -18,8 +18,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     )
   `
         )
-        .eq("user", email)
-        .order("name");
+        .eq("user", email);
       res.status(200).json(data);
     } catch (error) {
       res.status(500).json(error);

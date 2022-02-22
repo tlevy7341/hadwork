@@ -103,10 +103,7 @@ const ProgressBox = ({
   };
   const { data } = useQuery<TodosType[], Error>(
     ["todos", activeProject],
-    getTodos,
-    {
-      onSuccess: (data: TodosType[]) => {},
-    }
+    getTodos
   );
 
   //Used to drop a TodoCard
@@ -146,7 +143,7 @@ const ProgressBox = ({
     register,
     clearErrors,
     reset,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<FormData>();
 
   //Register the input field from React Hook Form
@@ -268,7 +265,7 @@ const ProgressBox = ({
                         <Button
                           type="submit"
                           onClick={() => {
-                            if (isValid) {
+                            if (!errors.task) {
                               onClose();
                             }
                           }}

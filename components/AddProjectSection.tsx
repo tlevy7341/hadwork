@@ -68,7 +68,7 @@ const AddProjectSection = ({
     register,
     clearErrors,
     reset,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<FormData>();
 
   //Register the input field from React Hook Form
@@ -86,9 +86,7 @@ const AddProjectSection = ({
 
       //Optimistically update the UI
       queryClient.setQueryData("projects", (prevProjects: any) => {
-        return [addedProject, ...prevProjects].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        );
+        return [...prevProjects, addedProject];
       });
 
       //Set the added project as the current project if there are no other projects
@@ -164,7 +162,7 @@ const AddProjectSection = ({
                   <Button
                     type="submit"
                     onClick={() => {
-                      if (isValid) {
+                      if (!errors.name) {
                         onClose();
                       }
                     }}
