@@ -268,7 +268,9 @@ const ProgressBox = ({
                         <Button
                           type="submit"
                           onClick={() => {
-                            onClose();
+                            if (isValid) {
+                              onClose();
+                            }
                           }}
                           m={"2"}
                           w={"100%"}

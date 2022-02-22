@@ -79,6 +79,31 @@ const AddProjectSection = ({
   //Update the cache
   const queryClient = useQueryClient();
   const { mutate } = useMutation(addProject, {
+    onMutate: (addedProject: ProjectsType) => {
+      //Get list of projects to see if there are any
+      const previousProjects: ProjectsType[] | undefined =
+        queryClient.getQueryData("projects");
+
+      //Optimistically update the UI
+      queryClient.setQueryData("projects", (prevProjects: any) => {
+        return [addedProject, ...prevProjects].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+      });
+
+      //Set the added project as the current project if there are no other projects
+      setActiveProject(addedProject.name);
+
+      setDisableButton(false);
+
+      return { previousProjects };
+    },
+    //If there was an error updating the cache, rollback the data
+    onError: (error, addedProject: ProjectsType, context) => {
+      if (context?.previousProjects) {
+        queryClient.setQueryData("projects", context.previousProjects);
+      }
+    },
     //Reloads the cache with the updated notes
     onSettled: async (data) => {
       queryClient.invalidateQueries("projects");
@@ -88,19 +113,6 @@ const AddProjectSection = ({
         duration: 2000,
         isClosable: true,
       });
-      setDisableButton(false);
-
-      //Get the project that was just added
-      const project: ProjectsType = await data?.json();
-
-      //Get list of projects to see if there are any
-      const previousProjects: ProjectsType[] | undefined =
-        queryClient.getQueryData("projects");
-
-      //Set the added project as the current project if there are no other projects
-      if (previousProjects?.length === 0) {
-        setActiveProject(project.name);
-      }
     },
   });
 
@@ -152,7 +164,9 @@ const AddProjectSection = ({
                   <Button
                     type="submit"
                     onClick={() => {
-                      onClose();
+                      if (isValid) {
+                        onClose();
+                      }
                     }}
                     m={"2"}
                     w={"100%"}
