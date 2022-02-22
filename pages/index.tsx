@@ -44,27 +44,28 @@ const getProjects = async () => {
 };
 
 const Home: NextPage = () => {
+  const [disableButton, setDisableButton] = useState(true);
   const { push } = useRouter();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
-  //const [activeProject, setActiveProject] = useState("HadWork");
   const [activeProject, setActiveProject] = useState(() => {
-    let project;
-    if (localStorage) {
-      console.log("Yes");
-      project = localStorage.getItem("activeProject");
+    const projects: ProjectsType[] | undefined =
+      queryClient.getQueryData("projects");
+    let initialState;
+    if (
+      typeof window !== "undefined" &&
+      localStorage.getItem("activeProject") !== null
+    ) {
+      initialState = localStorage.getItem("activeProject");
+    } else if (projects) {
+      const randomProject =
+        projects[Math.floor(Math.random() * projects.length)];
+      initialState = randomProject.name;
     } else {
-      const projects: ProjectsType[] | undefined =
-        queryClient.getQueryData("projects");
-
-      if (projects) {
-        const randomProject =
-          projects[Math.floor(Math.random() * projects.length)];
-        setActiveProject(randomProject.name);
-      }
+      initialState = "";
     }
 
-    return project !== null ? project : "";
+    return initialState;
   });
 
   const { data } = useQuery<ProjectsType[], Error>("projects", getProjects);
@@ -97,7 +98,11 @@ const Home: NextPage = () => {
             colSpan={{ base: 0, xl: 1 }}
           >
             <MenuHeader email={session!.user!.email!} />
-            <AddProjectSection email={session!.user!.email!} />
+            <AddProjectSection
+              email={session!.user!.email!}
+              setDisableButton={setDisableButton}
+              setActiveProject={setActiveProject}
+            />
             <Divider
               ml={10}
               w={"78%"}
@@ -114,14 +119,15 @@ const Home: NextPage = () => {
                     id={project.id}
                     user={project.user}
                     setActiveProject={setActiveProject}
+                    setDisableButton={setDisableButton}
                   />
                 );
               })}
           </GridItem>
           <GridItem rowSpan={2} colSpan={4} bg="gray.50">
             <VStack pt={"2"}>
-              <Heading color={"gray.700"}>
-                {activeProject ? activeProject : ""}
+              <Heading suppressHydrationWarning color={"gray.700"}>
+                {activeProject}
               </Heading>
             </VStack>
             <SimpleGrid
@@ -133,6 +139,7 @@ const Home: NextPage = () => {
               <ProgressBox
                 title={"Todo"}
                 activeProject={activeProject}
+                disableButton={disableButton}
                 icon={<FaHourglassStart />}
               />
               <ProgressBox

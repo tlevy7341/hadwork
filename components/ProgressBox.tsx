@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   Box,
   Flex,
@@ -10,19 +10,13 @@ import {
   PopoverContent,
   PopoverBody,
   Input,
-  Spacer,
   FormErrorMessage,
   FormControl,
   useToast,
 } from "@chakra-ui/react";
 import { useDrop } from "react-dnd";
 import TodoCard from "./TodoCard";
-import {
-  useQuery,
-  QueryClient,
-  useQueryClient,
-  useMutation,
-} from "react-query";
+import { useQuery, useQueryClient, useMutation } from "react-query";
 import { FaPlusSquare } from "react-icons/fa";
 import { v4 as uuidv4 } from "uuid";
 import { useForm } from "react-hook-form";
@@ -34,8 +28,8 @@ const ItemTypes = {
 type PropTypes = {
   title: string;
   icon: any;
-  todos: TodosType[];
-  activeProject: string;
+  activeProject: string | null;
+  disableButton?: boolean;
 };
 
 type FormData = {
@@ -49,10 +43,73 @@ type TodosType = {
   status: string;
 };
 
-const ProgressBox = ({ title, icon, todos, activeProject }: PropTypes) => {
+const ProgressBox = ({
+  title,
+  icon,
+  activeProject,
+  disableButton,
+}: PropTypes) => {
   const taskRef = useRef<HTMLInputElement | null>(null);
+  const queryClient = useQueryClient();
   const toast = useToast();
 
+  //Function to update the status of the Todo
+  const updateTodo = (todoToUpdate: TodosType) => {
+    return fetch("/api/todos", {
+      method: "PUT",
+      body: JSON.stringify(todoToUpdate),
+    });
+  };
+
+  //React Query to mutate the status of the Todo
+  const editMutation = useMutation(updateTodo, {
+    //Update the UI prior to the cache updating
+    onMutate: (editedTodo: TodosType) => {
+      // Snapshot the previous value
+      const previousTodos = queryClient.getQueryData(["todos", activeProject], {
+        exact: false,
+      });
+      // Optimistically update to the new value
+      queryClient.setQueryData(["todos", activeProject], (prevTodos: any) => {
+        return prevTodos.filter((todo: TodosType) =>
+          todo.id === editedTodo.id ? editedTodo : todo
+        );
+      });
+      // Return a context object with the snapshotted value
+      return { previousTodos };
+    },
+    //If there was an error updating the cache, rollback the data
+    onError: (error, newNote: TodosType, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(
+          ["todos", activeProject],
+          context.previousTodos
+        );
+      }
+    },
+    //Reloads the cache with the updated todos
+    onSettled: () => {
+      queryClient.invalidateQueries(["todos", activeProject]);
+      queryClient.invalidateQueries("projects");
+    },
+  });
+
+  //Handles getting the Todos
+  const getTodos = async () => {
+    const response = await fetch(
+      `http://localhost:3000/api/todos?projectName=${activeProject}`
+    );
+    return response.json();
+  };
+  const { data } = useQuery<TodosType[], Error>(
+    ["todos", activeProject],
+    getTodos,
+    {
+      onSuccess: (data: TodosType[]) => {},
+    }
+  );
+
+  //Used to drop a TodoCard
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ItemTypes.CARD,
     drop: (item: any) => moveTodoCard(item.id),
@@ -61,35 +118,22 @@ const ProgressBox = ({ title, icon, todos, activeProject }: PropTypes) => {
     }),
   }));
 
-  function moveTodoCard(id: any) {
-    //const todo = todosRef.current.filter((todo) => id === todo.id);
-    /* if (todo.length > 0) {
-      todo[0]["status"] = title;
-      setTodos(() =>
-        todosRef.current.filter((todo) => todo.id !== id).concat(todo[0])
-      );
-      fetch("/update-todo-status", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ todo }),
-      }); 
-    }*/
+  //Function used to handle moving the Todocard
+  function moveTodoCard(id: string) {
+    const myData: any = queryClient.getQueriesData(["todos"]).flat().pop();
+    const todoToMove: TodosType = myData.find(
+      (todo: TodosType) => id === todo.id
+    );
+    todoToMove.status = title;
+    editMutation.mutate(todoToMove);
   }
-  const getTodos = async () => {
-    const response = await fetch("http://localhost:3000/api/todos");
-    return response.json();
-  };
-
-  const { data } = useQuery<TodosType[], Error>("todos", getTodos);
 
   // Function to handle the form submission
   const onSubmit = (formData: FormData) => {
     const newTodo: TodosType = {
       id: uuidv4(),
       task: formData.task,
-      projectName: activeProject,
+      projectName: activeProject!,
       status: "todo",
     };
 
@@ -119,15 +163,16 @@ const ProgressBox = ({ title, icon, todos, activeProject }: PropTypes) => {
   };
 
   //Update the cache
-  const queryClient = useQueryClient();
   const addMutation = useMutation(addTodo, {
     //Update the UI prior to the cache updating
     onMutate: (todoToAdd: TodosType) => {
       // Snapshot the previous value
-      const previousTodos = queryClient.getQueryData("todos");
+      const previousTodos = queryClient.getQueryData(["todos"], {
+        exact: false,
+      });
       // Optimistically update to the new value
-      queryClient.setQueryData("todos", (prevTodos: any) => {
-        return [todoToAdd, ...prevTodos];
+      queryClient.setQueryData(["todos", activeProject], (prevTodos: any) => {
+        return [...prevTodos, todoToAdd];
       });
       // Return a context object with the snapshotted value
       return { previousTodos };
@@ -135,12 +180,15 @@ const ProgressBox = ({ title, icon, todos, activeProject }: PropTypes) => {
     //If there was an error updating the cache, rollback the data
     onError: (error, newNote: TodosType, context) => {
       if (context?.previousTodos) {
-        queryClient.setQueryData("todos", context.previousTodos);
+        queryClient.setQueryData(
+          ["todos", activeProject],
+          context.previousTodos
+        );
       }
     },
     //Reloads the cache with the updated todos
     onSettled: () => {
-      queryClient.invalidateQueries("todos");
+      queryClient.invalidateQueries(["todos", activeProject]);
       queryClient.invalidateQueries("projects");
       toast({
         title: "Todo created 🎉",
@@ -150,6 +198,8 @@ const ProgressBox = ({ title, icon, todos, activeProject }: PropTypes) => {
       });
     },
   });
+
+  useEffect(() => {}, [activeProject, data]);
 
   return (
     <Box
@@ -186,8 +236,9 @@ const ProgressBox = ({ title, icon, todos, activeProject }: PropTypes) => {
                 <>
                   <PopoverTrigger>
                     <IconButton
+                      suppressHydrationWarning
                       rounded={"lg"}
-                      disabled={activeProject === null || undefined}
+                      disabled={disableButton}
                       aria-label={"Add Todo"}
                       color={"gray.700"}
                       colorScheme="white"
@@ -234,11 +285,17 @@ const ProgressBox = ({ title, icon, todos, activeProject }: PropTypes) => {
         </Flex>
       </Flex>
 
-      {todos !== undefined
-        ? todos
+      {data !== undefined
+        ? data
             .filter((todo) => todo.status.toLowerCase() === title.toLowerCase())
             .map((todo) => (
-              <TodoCard key={todo.id} id={todo.id} task={todo.task} />
+              <TodoCard
+                key={todo.id}
+                id={todo.id}
+                task={todo.task}
+                status={todo.status}
+                projectName={activeProject!}
+              />
             ))
         : ""}
     </Box>

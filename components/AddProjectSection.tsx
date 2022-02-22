@@ -24,6 +24,8 @@ type FormData = {
 
 type PropsType = {
   email: string;
+  setDisableButton: Function;
+  setActiveProject: Function;
 };
 
 type ProjectsType = {
@@ -32,7 +34,11 @@ type ProjectsType = {
   user: string;
 };
 
-const AddProjectSection = ({ email }: PropsType) => {
+const AddProjectSection = ({
+  email,
+  setDisableButton,
+  setActiveProject,
+}: PropsType) => {
   //Ref for the input field
   const projectRef = useRef<HTMLInputElement | null>(null);
 
@@ -74,7 +80,7 @@ const AddProjectSection = ({ email }: PropsType) => {
   const queryClient = useQueryClient();
   const { mutate } = useMutation(addProject, {
     //Reloads the cache with the updated notes
-    onSettled: () => {
+    onSettled: async (data) => {
       queryClient.invalidateQueries("projects");
       toast({
         title: "Project deleted 🎉",
@@ -82,6 +88,19 @@ const AddProjectSection = ({ email }: PropsType) => {
         duration: 2000,
         isClosable: true,
       });
+      setDisableButton(false);
+
+      //Get the project that was just added
+      const project: ProjectsType = await data?.json();
+
+      //Get list of projects to see if there are any
+      const previousProjects: ProjectsType[] | undefined =
+        queryClient.getQueryData("projects");
+
+      //Set the added project as the current project if there are no other projects
+      if (previousProjects?.length === 0) {
+        setActiveProject(project.name);
+      }
     },
   });
 

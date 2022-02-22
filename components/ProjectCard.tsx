@@ -21,6 +21,7 @@ type PropsType = {
   setActiveProject: Function;
   name: string;
   user: string;
+  setDisableButton: Function;
 };
 
 type FormData = {
@@ -33,7 +34,13 @@ type ProjectsType = {
   user: string;
 };
 
-const ProjectCard = ({ name, id, user, setActiveProject }: PropsType) => {
+const ProjectCard = ({
+  name,
+  id,
+  user,
+  setActiveProject,
+  setDisableButton,
+}: PropsType) => {
   const [editing, setEditing] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -75,8 +82,41 @@ const ProjectCard = ({ name, id, user, setActiveProject }: PropsType) => {
 
   //React Query Function used to update the cache for deleting a project
   const deleteMutation = useMutation(deleteProject, {
+    onMutate: (deletedProject: ProjectsType) => {
+      //Set a different project after current project is deleted
+      const previousProjects: ProjectsType[] | undefined =
+        queryClient.getQueryData("projects");
+
+      const projects = previousProjects?.filter(
+        (project) => project.name !== deletedProject.name
+      );
+
+      if (projects && projects.length > 0) {
+        const randomProject =
+          projects[Math.floor(Math.random() * projects.length)];
+        setActiveProject(randomProject.name);
+      } else {
+        setActiveProject(null);
+        setDisableButton(true);
+      }
+
+      //Remove project from localStorage if set
+      const project = localStorage.getItem("activeProject");
+      if (project === deletedProject.name) {
+        localStorage.removeItem("activeProject");
+      }
+
+      return { previousProjects };
+    }, //If there was an error updating the cache, rollback the data
+    onError: (error, deletedProject: ProjectsType, context) => {
+      if (context?.previousProjects) {
+        queryClient.setQueryData("notes", context.previousProjects);
+      }
+    },
+
     onSuccess: () => {
       queryClient.invalidateQueries("projects");
+
       toast({
         title: "Project deleted 🎉",
         status: "success",
@@ -97,6 +137,7 @@ const ProjectCard = ({ name, id, user, setActiveProject }: PropsType) => {
     <Box
       onClick={() => {
         setActiveProject(name);
+        setDisableButton(false);
         localStorage.setItem("activeProject", name);
       }}
       cursor={"pointer"}
